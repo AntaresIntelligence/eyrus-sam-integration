@@ -1,9 +1,10 @@
-# Eyrus SAM.gov Integration
+# Eyrus SAM.gov Integration with Web Dashboard
 
-Enterprise-grade SAM.gov opportunities API integration for the Eyrus project. This system provides robust, scalable, and reliable integration with the SAM.gov API to fetch and store government contract opportunities.
+Enterprise-grade SAM.gov opportunities API integration with modern React dashboard for the Eyrus project. This system provides robust, scalable, and reliable integration with the SAM.gov API to fetch and store government contract opportunities, complete with a comprehensive web-based management interface.
 
 ## 🌟 Features
 
+### **Backend API**
 - **Enterprise-Grade Architecture**: Built for Fortune 100 companies with 24/7 reliability
 - **Comprehensive SAM.gov Integration**: Full support for opportunities API v2
 - **Advanced Rate Limiting**: Intelligent rate limiting to respect API quotas
@@ -12,24 +13,32 @@ Enterprise-grade SAM.gov opportunities API integration for the Eyrus project. Th
 - **Scheduled Synchronization**: Automated data sync with configurable intervals
 - **RESTful API**: Clean REST API for data access and management
 - **Database Optimization**: Optimized PostgreSQL schema with proper indexing
-- **Docker Support**: Production-ready containerization
-- **Comprehensive Testing**: Full test suite with integration tests
+
+### **Web Dashboard**
+- **Modern React Interface**: Responsive, enterprise-grade web dashboard
+- **Real-time Monitoring**: Live system health and performance metrics
+- **Data Visualization**: Interactive charts and graphs for insights
+- **Opportunity Management**: Browse, search, and filter opportunities
+- **Sync Management**: Manual sync controls and operation history
+- **Configuration Interface**: Web-based settings management
+- **Mobile Responsive**: Works seamlessly on desktop, tablet, and mobile
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   SAM.gov API   │    │  Eyrus SAM App  │    │   PostgreSQL    │
-│                 │◄──►│                 │◄──►│                 │
+│   SAM.gov API   │    │  Backend API    │    │   PostgreSQL    │
+│                 │◄──►│ Express + TS    │◄──►│                 │
 │ Opportunities   │    │ Rate Limited    │    │ sam_opportunities│
 │ Award Notices   │    │ Error Handling  │    │ sam_sync_logs   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                │
                        ┌───────▼───────┐
-                       │   REST API    │
-                       │ /opportunities│
-                       │ /sync         │
-                       │ /health       │
+                       │   React UI    │
+                       │   Dashboard   │
+                       │ - Monitoring  │
+                       │ - Management  │
+                       │ - Analytics   │
                        └───────────────┘
 ```
 
@@ -46,7 +55,9 @@ Enterprise-grade SAM.gov opportunities API integration for the Eyrus project. Th
 ```bash
 git clone https://github.com/AntaresIntelligence/eyrus-sam-integration.git
 cd eyrus-sam-integration
-npm install
+
+# Install both backend and frontend dependencies
+npm run install:all
 ```
 
 ### 2. Environment Setup
@@ -92,15 +103,75 @@ npm run health-check
 npm run test:implementation
 ```
 
-### 5. Start Application
+### 5. Start the Application
 
+#### **Development Mode (Recommended)**
 ```bash
-# Development mode
-npm run dev
-
-# Production mode
-npm run build && npm start
+# Start both backend and frontend in development mode
+npm run dev:full
 ```
+
+This will start:
+- Backend API at `http://localhost:3000`
+- React dashboard at `http://localhost:3001` (with API proxy)
+- Automatic reload for both on code changes
+
+#### **Production Mode**
+```bash
+# Build everything
+npm run build:all
+
+# Start production server
+npm start
+```
+
+Production mode serves the React app from the backend at `http://localhost:3000`
+
+## 🖥️ Web Dashboard
+
+### **Dashboard Overview**
+The main dashboard provides a comprehensive overview of your SAM.gov integration:
+
+- **System Health Status**: Real-time health monitoring with component-level details
+- **Key Metrics**: Total opportunities, sync statistics, system uptime
+- **Recent Activity**: Latest sync operations and their status
+- **Performance Charts**: Response times and system resource usage
+
+### **Opportunities Management**
+Browse and manage SAM.gov opportunities with advanced features:
+
+- **Advanced Search**: Search by title, description, or solicitation number
+- **Smart Filters**: Filter by NAICS code, department, opportunity type, date ranges
+- **Detailed View**: Complete opportunity information with direct SAM.gov links
+- **Export Capabilities**: Download opportunity data for external analysis
+- **Real-time Updates**: Automatic refresh of opportunity listings
+
+### **Sync Management**
+Complete control over synchronization operations:
+
+- **Manual Sync**: Trigger custom sync operations with specific parameters
+- **Sync History**: Detailed logs of all synchronization operations
+- **Performance Metrics**: Success rates, processing times, error analysis
+- **Connection Testing**: Verify SAM.gov API connectivity
+- **Data Cleanup**: Manage data retention and cleanup operations
+
+### **System Health Monitoring**
+Enterprise-grade monitoring and diagnostics:
+
+- **Component Health**: Database, SAM.gov API, memory, and disk monitoring
+- **Performance Metrics**: Response time charts and system resource usage
+- **Real-time Alerts**: Visual indicators for system issues
+- **Historical Data**: Trend analysis and performance over time
+- **Cache Management**: Clear health check cache for fresh data
+
+### **Configuration Management**
+Web-based configuration interface:
+
+- **Database Settings**: Connection parameters, pool configuration
+- **API Configuration**: SAM.gov API settings, rate limits, timeouts
+- **Sync Settings**: Automation intervals, batch sizes, retry logic
+- **Monitoring**: Log levels, health check intervals, alert settings
+- **Data Retention**: Automatic cleanup policies and retention periods
 
 ## 📖 API Documentation
 
@@ -165,31 +236,6 @@ Retrieve opportunities with filtering and pagination
 GET /api/v1/opportunities?postedFrom=2025-01-01&postedTo=2025-06-16&naicsCode=236220&limit=100
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "opportunityId": "12345",
-      "title": "Construction Project",
-      "description": "Major construction project...",
-      "naicsCode": "236220",
-      "department": "Department of Defense",
-      "postedDate": "2025-01-15T00:00:00.000Z",
-      "responseDeadline": "2025-02-15T00:00:00.000Z",
-      "awardAmount": 1000000.00
-    }
-  ],
-  "meta": {
-    "count": 1,
-    "limit": 100,
-    "offset": 0
-  }
-}
-```
-
 #### GET /opportunities/:id
 Get specific opportunity by ID
 
@@ -209,20 +255,6 @@ Trigger manual synchronization
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Manual sync started successfully",
-  "syncOptions": {
-    "postedFrom": "2025-01-01",
-    "postedTo": "2025-06-16",
-    "ptype": "a", 
-    "ncode": "236220"
-  }
-}
-```
-
 #### GET /sync/history
 Get synchronization history
 
@@ -232,228 +264,229 @@ Get current sync status and statistics
 #### POST /sync/test
 Test SAM.gov API connectivity
 
-## 🔧 Configuration
+## 🎨 UI Components & Features
 
-### Environment Variables
+### **Component Library**
+The dashboard uses a custom component library built with:
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `DB_HOST` | Database host | localhost | ✅ |
-| `DB_PORT` | Database port | 5432 | ❌ |
-| `DB_NAME` | Database name | eyrus_sam | ✅ |
-| `DB_USER` | Database user | postgres | ✅ |
-| `DB_PASSWORD` | Database password | - | ✅ |
-| `SAM_API_KEY` | SAM.gov API key | - | ✅ |
-| `SAM_API_BASE_URL` | SAM.gov API base URL | - | ✅ |
-| `SYNC_INTERVAL_MINUTES` | Auto-sync interval | 30 | ❌ |
-| `LOG_LEVEL` | Logging level | info | ❌ |
-| `PORT` | Server port | 3000 | ❌ |
+- **React 18**: Latest React features with concurrent rendering
+- **TypeScript**: Full type safety throughout the application
+- **Tailwind CSS**: Utility-first CSS framework for rapid development
+- **Lucide React**: Beautiful, customizable icons
+- **React Query**: Powerful data fetching and caching
+- **React Router**: Client-side routing with history management
+- **React Hook Form**: Performant forms with easy validation
+- **Recharts**: Responsive charts and data visualization
+- **React Hot Toast**: Elegant toast notifications
 
-### Database Schema
+### **Design System**
+- **Consistent Color Palette**: Professional blue and gray color scheme
+- **Typography**: Inter font family for excellent readability
+- **Responsive Grid**: Mobile-first responsive design
+- **Loading States**: Smooth loading indicators throughout
+- **Error Handling**: Graceful error states with recovery options
+- **Accessibility**: ARIA labels and keyboard navigation support
 
-The system creates three main tables:
+### **Real-time Updates**
+- **Auto-refresh**: Key data refreshes automatically
+- **Loading Indicators**: Visual feedback for all operations
+- **Error Recovery**: Automatic retry logic for failed requests
+- **Cache Management**: Intelligent caching with invalidation
 
-1. **sam_opportunities**: Stores opportunity data with comprehensive fields
-2. **sam_sync_logs**: Tracks all synchronization operations 
-3. **sam_api_rate_limits**: Manages API rate limiting
+## 🔧 Development
 
-## 🔄 Scheduled Operations
-
-### Automatic Synchronization
-- **Frequency**: Every 30 minutes (configurable)
-- **Data Range**: Last 30 days
-- **Filters**: Award notices (ptype=a), NAICS 236220
-
-### Data Cleanup
-- **Frequency**: Daily at 2 AM UTC
-- **Retention**: 365 days (configurable)
-- **Operation**: Soft delete old records
-
-### Health Monitoring
-- **Frequency**: Every 5 minutes
-- **Components**: Database, SAM.gov API, Memory, Disk
-- **Alerting**: Configurable email alerts
-
-## 🐳 Docker Deployment
-
-### Development
-```bash
-docker-compose up -d
+### **Project Structure**
+```
+├── src/                 # Backend TypeScript source
+│   ├── config/         # Configuration management
+│   ├── database/       # Database migrations and connection
+│   ├── repositories/   # Data access layer
+│   ├── services/       # Business logic layer
+│   ├── routes/         # API route handlers
+│   ├── utils/         # Utility functions
+│   └── scripts/       # Maintenance scripts
+└── web/                # Frontend React source
+    ├── src/
+    │   ├── components/ # Reusable UI components
+    │   ├── pages/     # Page components
+    │   ├── hooks/     # Custom React hooks
+    │   ├── services/  # API service layer
+    │   └── utils/     # Frontend utilities
+    ├── public/        # Static assets
+    └── dist/          # Built frontend assets
 ```
 
-### Production
+### **Development Scripts**
+
+#### **Backend Development**
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+npm run dev              # Start backend in development mode
+npm run build           # Build backend TypeScript
+npm run test           # Run backend tests
+npm run lint           # Lint backend code
+npm run migrate        # Run database migrations
 ```
 
-## 📊 Monitoring & Observability
-
-### Logging
-- **Structured JSON logging** with Winston
-- **Log levels**: error, warn, info, debug
-- **Log files**: `logs/error.log`, `logs/combined.log`
-- **Performance metrics** for all operations
-
-### Health Checks
-- **Liveness probe**: `/health/liveness`
-- **Readiness probe**: `/health/readiness`
-- **Detailed health**: `/health/detailed`
-
-### Metrics
-- API response times
-- Database operation performance
-- SAM.gov API rate limit status
-- Sync operation statistics
-
-## 🧪 Testing
-
-### Run All Tests
+#### **Frontend Development**
 ```bash
-npm test
+npm run dev:web         # Start frontend development server
+npm run build:web       # Build frontend for production
+npm run lint:web        # Lint frontend code
 ```
 
-### Integration Tests
+#### **Full Stack Development**
 ```bash
-npm run test:implementation
+npm run dev:full        # Start both backend and frontend
+npm run build:all       # Build both backend and frontend
+npm run lint:all        # Lint both backend and frontend
+npm run install:all     # Install all dependencies
 ```
 
-### Health Check
-```bash
-npm run health-check
-```
-
-### Test Coverage
-```bash
-npm run test:coverage
-```
+### **Code Quality**
+- **TypeScript**: Full type safety across backend and frontend
+- **ESLint**: Code linting with custom rules
+- **Prettier**: Consistent code formatting
+- **Husky**: Git hooks for quality checks
+- **Jest**: Comprehensive test suite
 
 ## 🚨 Error Handling & Recovery
 
-### API Errors
-- **Retry logic**: Exponential backoff for transient failures
-- **Rate limiting**: Automatic throttling to respect API limits
-- **Circuit breaker**: Fail-fast for persistent API issues
+### **Frontend Error Handling**
+- **React Error Boundaries**: Graceful component error recovery
+- **API Error Handling**: Automatic retry logic with exponential backoff
+- **Toast Notifications**: User-friendly error messages
+- **Loading States**: Clear loading indicators for all operations
+- **Offline Detection**: Handle network connectivity issues
 
-### Database Errors
-- **Connection pooling**: Automatic reconnection handling
-- **Transaction rollback**: Ensure data consistency
-- **Dead letter queue**: For failed operations
-
-### Monitoring & Alerts
-- **Failed sync notifications**: Email alerts for sync failures
-- **Health check failures**: Immediate alerting for critical issues
-- **Performance degradation**: Warnings for slow operations
+### **Backend Error Handling**
+- **API Errors**: Retry logic with circuit breaker pattern
+- **Database Errors**: Connection pooling with automatic reconnection
+- **Rate Limiting**: Graceful degradation when limits are reached
+- **Health Monitoring**: Automatic alerting for critical issues
 
 ## 🔐 Security
 
-### API Security
-- **Rate limiting**: Prevent abuse and DoS attacks
-- **Input validation**: Comprehensive parameter validation
-- **CORS configuration**: Restricted cross-origin requests
-- **Helmet.js**: Security headers and protection
+### **Frontend Security**
+- **XSS Protection**: Sanitized user input and secure rendering
+- **CSRF Protection**: Token-based request validation
+- **Secure Headers**: Helmet.js security headers
+- **Input Validation**: Client and server-side validation
+- **API Security**: Secure communication with backend
 
-### Data Security
-- **Environment variables**: Sensitive data in environment configs
-- **API key protection**: Never log or expose API keys
-- **Database encryption**: SSL/TLS for database connections
-- **Access logging**: All API access logged for auditing
+### **Backend Security**
+- **Rate Limiting**: Prevent abuse and DoS attacks
+- **Input Validation**: Comprehensive parameter validation
+- **CORS Configuration**: Restricted cross-origin requests
+- **Environment Variables**: Sensitive data protection
+- **API Key Management**: Secure SAM.gov API key handling
 
-## 📚 Key Implementation Details
+## 📱 Mobile & Responsive Design
 
-### Rate Limiting Strategy
-- **60 requests per minute** to SAM.gov API (configurable)
-- **Memory-based rate limiting** with Redis option
-- **Graceful degradation** when limits approached
+The dashboard is fully responsive and works seamlessly across all devices:
 
-### Data Processing
-- **Batch processing**: 100 records per batch (configurable)
-- **Incremental sync**: Only fetch changed data
-- **Duplicate detection**: Prevent duplicate opportunity records
-- **Data validation**: Comprehensive validation before storage
+- **Desktop**: Full-featured interface with all capabilities
+- **Tablet**: Optimized layout with touch-friendly controls
+- **Mobile**: Streamlined interface with essential features
+- **Progressive Web App**: Install as an app on mobile devices
 
-### Enterprise Features
-- **Horizontal scaling**: Stateless design for load balancing
-- **Circuit breaker pattern**: Fail-fast for downstream failures
-- **Graceful shutdown**: Clean termination with running operations
-- **Resource monitoring**: Memory and CPU usage tracking
+## 🛠️ Deployment Options
 
-## 🛠️ Development
+### **Production Deployment**
+```bash
+# Build everything for production
+npm run build:all
 
-### Project Structure
-```
-src/
-├── config/           # Configuration management
-├── database/         # Database migrations and connection
-├── repositories/     # Data access layer
-├── services/         # Business logic layer
-├── routes/           # API route handlers
-├── utils/           # Utility functions and helpers
-└── scripts/         # Maintenance and deployment scripts
+# Start production server
+npm start
 ```
 
-### Code Quality
-- **TypeScript**: Full type safety
-- **ESLint**: Code linting and style enforcement
-- **Prettier**: Code formatting
-- **Husky**: Git hooks for quality checks
+### **Docker Deployment**
+```bash
+# Development
+docker-compose up -d
 
-### Contributing
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+# Production
+docker-compose -f docker-compose.prod.yml up -d
+```
 
-## 📞 Support
+### **Environment Variables for Production**
+```env
+NODE_ENV=production
+PORT=3000
+DB_SSL=true
+LOG_LEVEL=warn
+SENTRY_DSN=your_sentry_dsn
+```
 
-### Documentation
+## 🎯 **Next Steps After Setup**
+
+1. **Access the Dashboard**: Navigate to `http://localhost:3000` (production) or `http://localhost:3001` (development)
+
+2. **Configure Settings**: Use the Settings page to configure your specific requirements
+
+3. **Test API Connection**: Use the Sync Management page to test SAM.gov connectivity
+
+4. **Run First Sync**: Execute a manual sync with your desired parameters
+
+5. **Monitor System**: Use the Health page to monitor system performance
+
+6. **Set Up Automation**: Configure automatic sync intervals in Settings
+
+## 📞 Support & Documentation
+
+### **Getting Help**
+- **Dashboard Help**: Built-in help tooltips and guidance
 - **API Documentation**: Available at `/api/v1/docs` (when running)
-- **Health Dashboard**: Available at `/health/detailed`
-- **Logs**: Check `logs/` directory for detailed logs
+- **Health Dashboard**: Real-time system status at `/health/detailed`
+- **Log Analysis**: Check `logs/` directory for detailed logs
 
-### Troubleshooting
+### **Common Issues**
 
-#### Common Issues
-
-**Database Connection Fails**
+**Web UI Not Loading**
 ```bash
-# Check database status
-npm run health-check
+# Check if frontend is built
+npm run build:web
 
-# Verify environment variables
-cat .env | grep DB_
+# Verify API is running
+curl http://localhost:3000/health
 ```
 
-**SAM.gov API Issues**
+**API Connection Issues**
 ```bash
-# Test API connectivity
-curl -X POST http://localhost:3000/api/v1/sync/test
-
-# Check API key validity
+# Test API from the dashboard
+# Or manually test connection
 npm run test:implementation
 ```
 
-**Sync Operations Failing**
+**Database Connection Problems**
 ```bash
-# Check sync logs
-npm run logs:sync
+# Verify database status
+npm run health-check
 
-# Review error details
-GET /api/v1/sync/history
+# Check environment variables
+cat .env | grep DB_
 ```
 
-## 📝 License
+## 🚀 **Performance Optimizations**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### **Frontend Performance**
+- **Code Splitting**: Automatic route-based code splitting
+- **Lazy Loading**: Components loaded on demand
+- **Caching**: Intelligent API response caching
+- **Compression**: Gzip compression for static assets
+- **Bundle Optimization**: Tree shaking and minification
 
-## 🙏 Acknowledgments
-
-- **SAM.gov**: For providing the opportunities API
-- **Eyrus Team**: For project requirements and specifications
-- **Open Source Community**: For the excellent libraries used in this project
+### **Backend Performance**
+- **Database Indexing**: Optimized queries with proper indexes
+- **Connection Pooling**: Efficient database connection management
+- **Caching**: Redis-compatible caching layer
+- **Rate Limiting**: Prevents system overload
+- **Monitoring**: Real-time performance metrics
 
 ---
 
-**Built with ❤️ for enterprise reliability and scale**
+**Built with ❤️ for enterprise reliability and modern user experience**
+
+The combination of robust backend architecture and intuitive web interface makes this the complete solution for SAM.gov integration at enterprise scale.
 
 For questions or support, please contact the Eyrus development team.
