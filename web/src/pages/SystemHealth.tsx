@@ -1,16 +1,11 @@
-import React, { useState } from 'react'
+import React from 'react'
 import {
-  Activity,
   Database,
-  Zap,
   Shield,
   Server,
-  Clock,
   RefreshCw,
   AlertTriangle,
   CheckCircle,
-  TrendingUp,
-  TrendingDown,
   Monitor,
   HardDrive,
   Cpu,

@@ -1,17 +1,14 @@
 import React, { useState } from 'react'
 import {
-  Settings as SettingsIcon,
   Database,
   Server,
   Clock,
-  Shield,
   Bell,
   Save,
   RefreshCw,
   Eye,
   EyeOff,
   AlertTriangle,
-  CheckCircle,
 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
@@ -93,7 +90,7 @@ export default function Settings() {
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState('database')
   
-  const { register, handleSubmit, formState: { errors, isDirty }, watch } = useForm<SettingsFormData>({
+  const { register, handleSubmit, formState: { errors, isDirty } } = useForm<SettingsFormData>({
     defaultValues: {
       // Database settings
       dbHost: 'localhost',

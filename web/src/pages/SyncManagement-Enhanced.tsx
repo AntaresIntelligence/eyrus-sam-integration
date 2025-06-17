@@ -107,7 +107,6 @@ export default function SyncManagement() {
 
       console.log('🚀 Triggering SAM.gov sync:', payload);
       
-      // Call the working backend endpoint that handles SAM.gov API
       const response = await axios.post('http://localhost:3003/api/sync/sam', payload);
       
       if (response.data.success) {
@@ -126,30 +125,14 @@ export default function SyncManagement() {
 
   const testConnection = async () => {
     try {
-      const response = await axios.get('https://api.sam.gov/prod/opportunities/v2/search', {
-        params: {
-          api_key: 'cyPX1StgZ8Y1VaXyqkTM6RW0v6FJSP7UvLoPhyOd',
-          postedFrom: '2025-06-01',
-          postedTo: '2025-06-17',
-          ncode: '236220',
-          limit: 1
-        },
-        headers: {
-          'X-API-Key': 'cyPX1StgZ8Y1VaXyqkTM6RW0v6FJSP7UvLoPhyOd'
-        }
-      });
-      
-      if (response.data.totalRecords !== undefined) {
-        toast.success(`SAM.gov API connection successful! Found ${response.data.totalRecords} total opportunities.`);
+      const response = await axios.get('http://localhost:3003/health');
+      if (response.data.sam_api_configured) {
+        toast.success('SAM.gov API connection is configured and ready!');
       } else {
-        toast.error('SAM.gov API returned unexpected data');
+        toast.error('SAM.gov API not configured');
       }
-    } catch (error: any) {
-      if (error.response?.status === 429) {
-        toast.error('SAM.gov API rate limited. Connection is working but throttled.');
-      } else {
-        toast.error('Failed to connect to SAM.gov API');
-      }
+    } catch (error) {
+      toast.error('Failed to test connection');
     }
   };
 

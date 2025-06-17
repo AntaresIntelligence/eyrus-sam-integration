@@ -1,1 +1,176 @@
-import axios from 'axios'\n\nconst api = axios.create({\n  baseURL: '/api/v1',\n  timeout: 30000,\n  headers: {\n    'Content-Type': 'application/json',\n  },\n})\n\n// Request interceptor for logging\napi.interceptors.request.use(\n  (config) => {\n    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`)\n    return config\n  },\n  (error) => {\n    console.error('API Request Error:', error)\n    return Promise.reject(error)\n  }\n)\n\n// Response interceptor for error handling\napi.interceptors.response.use(\n  (response) => {\n    return response\n  },\n  (error) => {\n    console.error('API Response Error:', error.response?.data || error.message)\n    return Promise.reject(error)\n  }\n)\n\n// Health Check API\nexport const healthApi = {\n  getHealth: () => api.get('/health'),\n  getDetailedHealth: () => api.get('/health/detailed'),\n  getLiveness: () => api.get('/health/liveness'),\n  getReadiness: () => api.get('/health/readiness'),\n  clearCache: () => api.post('/health/cache/clear'),\n}\n\n// Opportunities API\nexport const opportunitiesApi = {\n  getOpportunities: (params?: {\n    limit?: number\n    offset?: number\n    postedFrom?: string\n    postedTo?: string\n    naicsCode?: string\n    department?: string\n    opportunityType?: string\n    searchTerm?: string\n  }) => api.get('/opportunities', { params }),\n  \n  getOpportunityById: (id: string) => api.get(`/opportunities/${id}`),\n  \n  getStatistics: () => api.get('/opportunities/stats'),\n}\n\n// Sync API\nexport const syncApi = {\n  triggerManualSync: (data: {\n    postedFrom: string\n    postedTo: string\n    ptype?: string\n    ncode?: string\n    dryRun?: boolean\n  }) => api.post('/sync/manual', data),\n  \n  testConnection: () => api.post('/sync/test'),\n  \n  getSyncHistory: (limit?: number) => api.get('/sync/history', { params: { limit } }),\n  \n  getSyncStatus: () => api.get('/sync/status'),\n  \n  triggerCleanup: () => api.post('/sync/cleanup'),\n}\n\n// TypeScript interfaces\nexport interface ApiResponse<T> {\n  success: boolean\n  data: T\n  message?: string\n  timestamp: string\n  meta?: {\n    count: number\n    limit: number\n    offset: number\n  }\n}\n\nexport interface HealthCheck {\n  status: 'healthy' | 'unhealthy'\n  timestamp: string\n  uptime: number\n  version: string\n  environment: string\n  checks: {\n    database: HealthComponent\n    samApi: HealthComponent\n    memory: HealthComponent\n    disk: HealthComponent\n  }\n  overall: {\n    status: 'healthy' | 'unhealthy'\n    message: string\n  }\n}\n\nexport interface HealthComponent {\n  status: 'healthy' | 'unhealthy'\n  responseTime: number\n  message: string\n  details?: any\n}\n\nexport interface Opportunity {\n  id: string\n  opportunityId: string\n  noticeId?: string\n  title: string\n  description?: string\n  opportunityType?: string\n  baseType?: string\n  naicsCode?: string\n  department?: string\n  subTier?: string\n  office?: string\n  solicitationNumber?: string\n  postedDate?: string\n  responseDeadline?: string\n  updatedDate?: string\n  awardNumber?: string\n  awardAmount?: number\n  awardeeName?: string\n  awardeeDuns?: string\n  awardeeCage?: string\n  samUrl?: string\n  syncStatus?: string\n  lastSyncedAt?: string\n  createdAt?: string\n  updatedAt?: string\n}\n\nexport interface SyncLog {\n  id: string\n  syncType: string\n  status: string\n  startedAt: string\n  completedAt?: string\n  recordsProcessed?: number\n  recordsCreated?: number\n  recordsUpdated?: number\n  recordsFailed?: number\n  errorDetails?: any\n  syncParameters?: any\n  notes?: string\n  createdAt?: string\n  updatedAt?: string\n}\n\nexport interface SyncResult {\n  success: boolean\n  syncId: string\n  recordsProcessed: number\n  recordsCreated: number\n  recordsUpdated: number\n  recordsFailed: number\n  errors: string[]\n  duration: number\n  startTime: string\n  endTime: string\n}\n\nexport default api\n"
+import axios from 'axios'
+
+const api = axios.create({
+  baseURL: 'http://localhost:3000/api',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Request interceptor for logging
+api.interceptors.request.use(
+  (config) => {
+    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`)
+    return config
+  },
+  (error) => {
+    console.error('API Request Error:', error)
+    return Promise.reject(error)
+  }
+)
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => {
+    return response
+  },
+  (error) => {
+    console.error('API Response Error:', error.response?.data || error.message)
+    return Promise.reject(error)
+  }
+)
+
+// Health Check API
+export const healthApi = {
+  getHealth: () => axios.get('http://localhost:3000/health'),
+  getDetailedHealth: () => api.get('/health/detailed'),
+  getLiveness: () => api.get('/health/liveness'),
+  getReadiness: () => api.get('/health/readiness'),
+  clearCache: () => api.post('/health/cache/clear'),
+}
+
+// Opportunities API
+export const opportunitiesApi = {
+  getOpportunities: (params?: {
+    limit?: number
+    offset?: number
+    postedFrom?: string
+    postedTo?: string
+    naicsCode?: string
+    department?: string
+    opportunityType?: string
+    searchTerm?: string
+  }) => api.get('/opportunities', { params }),
+  
+  getOpportunityById: (id: string) => api.get(`/opportunities/${id}`),
+  
+  getStatistics: () => api.get('/statistics'),
+}
+
+// Sync API - Updated to match real server endpoints
+export const syncApi = {
+  triggerManualSync: (data: {
+    naics_codes: string[]
+    posted_from: string
+    posted_to: string
+    limit?: number
+    dry_run?: boolean
+  }) => api.post('/sync/sam', data),
+  
+  testConnection: () => api.get('/test-connection'),
+  
+  getSyncHistory: (limit?: number) => api.get('/sync/active', { params: { limit } }),
+  
+  getSyncStatus: (syncId?: string) => syncId ? api.get(`/sync/status/${syncId}`) : api.get('/sync/active'),
+  
+  getActiveSyncs: () => api.get('/sync/active'),
+}
+
+// TypeScript interfaces
+export interface ApiResponse<T> {
+  success: boolean
+  data: T
+  message?: string
+  timestamp: string
+  meta?: {
+    count: number
+    limit: number
+    offset: number
+  }
+}
+
+export interface HealthCheck {
+  status: 'healthy' | 'unhealthy'
+  timestamp: string
+  uptime: number
+  version: string
+  environment: string
+  checks: {
+    database: HealthComponent
+    samApi: HealthComponent
+    memory: HealthComponent
+    disk: HealthComponent
+  }
+  overall: {
+    status: 'healthy' | 'unhealthy'
+    message: string
+  }
+}
+
+export interface HealthComponent {
+  status: 'healthy' | 'unhealthy'
+  responseTime: number
+  message: string
+  details?: any
+}
+
+export interface Opportunity {
+  id: string
+  opportunityId: string
+  noticeId?: string
+  title: string
+  description?: string
+  opportunityType?: string
+  baseType?: string
+  naicsCode?: string
+  department?: string
+  subTier?: string
+  office?: string
+  solicitationNumber?: string
+  postedDate?: string
+  responseDeadline?: string
+  updatedDate?: string
+  awardNumber?: string
+  awardAmount?: number
+  awardeeName?: string
+  awardeeDuns?: string
+  awardeeCage?: string
+  samUrl?: string
+  syncStatus?: string
+  lastSyncedAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface SyncLog {
+  id: string
+  syncType: string
+  status: string
+  startedAt: string
+  completedAt?: string
+  recordsProcessed?: number
+  recordsCreated?: number
+  recordsUpdated?: number
+  recordsFailed?: number
+  errorDetails?: any
+  syncParameters?: any
+  notes?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface SyncResult {
+  success: boolean
+  syncId: string
+  recordsProcessed: number
+  recordsCreated: number
+  recordsUpdated: number
+  recordsFailed: number
+  errors: string[]
+  duration: number
+  startTime: string
+  endTime: string
+}
+
+export default api

@@ -4,7 +4,7 @@ class SamDashboard {
         this.currentOpportunities = [];
         this.filteredOpportunities = [];
         this.isLoading = false;
-        this.apiBaseUrl = '/api';
+        this.apiBaseUrl = 'http://localhost:3000/api';
         
         this.initializeEventListeners();
         this.loadInitialData();

@@ -92,6 +92,120 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /sync/sam
+ * Trigger SAM.gov sync operation (main UI endpoint)
+ */
+router.post('/sam', async (req: Request, res: Response) => {
+  try {
+    const {
+      naics_codes = ['236210', '236220', '237110', '237130', '237310', '237990'],
+      posted_from = '2025-01-01',
+      posted_to = '2025-06-16',
+      limit = 1000,
+      dry_run = false,
+    } = req.body;
+
+    // Validate required parameters
+    if (!posted_from || !posted_to) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'posted_from and posted_to are required parameters',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Validate NAICS codes array
+    if (!Array.isArray(naics_codes) || naics_codes.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'naics_codes must be a non-empty array',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(posted_from) || !dateRegex.test(posted_to)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Dates must be in YYYY-MM-DD format',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Validate date range
+    const fromDate = new Date(posted_from);
+    const toDate = new Date(posted_to);
+    
+    if (fromDate > toDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'posted_from must be before or equal to posted_to',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const syncOptions = {
+      naicsCodes: naics_codes,
+      postedFrom: posted_from,
+      postedTo: posted_to,
+      ptype: 'a', // Award notices
+      dryRun: Boolean(dry_run),
+    };
+
+    logger.info('SAM sync triggered from UI', { 
+      syncOptions,
+      requestedBy: req.ip,
+    });
+
+    logBusinessEvent('ui_sam_sync_triggered', {
+      syncOptions,
+      requestedBy: req.ip,
+    });
+
+    // Start the sync operation
+    const result = await samOpportunitiesService.syncOpportunitiesForNaicsCodes(
+      naics_codes,
+      syncOptions
+    );
+
+    return res.json({
+      success: result.success,
+      message: result.success ? 'SAM sync completed successfully' : 'SAM sync completed with errors',
+      data: {
+        syncId: result.syncId,
+        recordsProcessed: result.recordsProcessed,
+        recordsCreated: result.recordsCreated,
+        recordsUpdated: result.recordsUpdated,
+        recordsFailed: result.recordsFailed,
+        duration: result.duration,
+        startTime: result.startTime,
+        endTime: result.endTime,
+      },
+      errors: result.errors,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logError(error, 'ui_sam_sync_api_failed', {
+      body: req.body,
+      requestedBy: req.ip,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to start SAM sync',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
  * POST /sync/manual
  * Trigger a manual sync operation (legacy endpoint)
  */
@@ -299,6 +413,53 @@ router.post('/cleanup', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Data cleanup failed',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
+ * GET /sync/active
+ * Get active sync operations (for UI polling)
+ */
+router.get('/active', async (req: Request, res: Response) => {
+  try {
+    logger.debug('Fetching active sync operations');
+
+    // Get recent sync logs to determine active operations
+    const recentSyncs = await samOpportunitiesService.getSyncHistory(20);
+    
+    // Filter for active/running syncs (those that started but haven't completed)
+    const activeSyncs = recentSyncs.filter(sync => 
+      sync.status === 'running' || sync.status === 'in_progress' || 
+      (sync.status === 'started' && !sync.completedAt)
+    );
+
+    // Get the most recent sync for status
+    const latestSync = recentSyncs[0] || null;
+
+    res.json({
+      success: true,
+      data: {
+        activeSyncs,
+        latestSync,
+        hasActiveSync: activeSyncs.length > 0,
+        totalActiveOps: activeSyncs.length,
+      },
+      meta: {
+        count: activeSyncs.length,
+        lastChecked: new Date().toISOString(),
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logError(error, 'get_active_syncs_api_failed');
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch active sync operations',
       message: error.message,
       timestamp: new Date().toISOString(),
     });

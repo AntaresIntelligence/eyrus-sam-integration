@@ -10,7 +10,7 @@ class SalesDashboard {
             projectType: '',
             timeframe: 90
         };
-        this.apiBaseUrl = '/api/sales';
+        this.apiBaseUrl = 'http://localhost:3000/api/sales';
         
         this.initializeEventListeners();
         this.loadDashboardData();

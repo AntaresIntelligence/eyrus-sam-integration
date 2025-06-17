@@ -14,8 +14,7 @@ import {
 } from 'lucide-react'
 import { useOpportunities } from '../hooks/useApi'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { formatDistanceToNow, format } from 'date-fns'
-import { Link } from 'react-router-dom'
+import { format } from 'date-fns'
 
 interface FiltersState {
   searchTerm: string
