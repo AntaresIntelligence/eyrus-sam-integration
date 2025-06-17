@@ -5,14 +5,21 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "build:web": "cd web && npm run build",
+    "build:all": "npm run build && npm run build:web",
+    "start": "node dist/server.js",
     "dev": "ts-node src/index.ts",
+    "dev:web": "cd web && npm run dev",
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:web\"",
+    "install:all": "npm install && cd web && npm install",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:implementation": "ts-node src/scripts/test-implementation.ts",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
+    "lint:web": "cd web && npm run lint",
+    "lint:all": "npm run lint && npm run lint:web",
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
     "health-check": "ts-node -e \"import('./src/services/healthCheckService').then(h => h.healthCheckService.performHealthCheck(true).then(console.log))\""
@@ -48,7 +55,8 @@
     "ts-node": "^10.9.1",
     "typescript": "^5.3.0",
     "supertest": "^6.3.3",
-    "@types/supertest": "^2.0.16"
+    "@types/supertest": "^2.0.16",
+    "concurrently": "^8.2.2"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -60,7 +68,9 @@
     "opportunities",
     "api",
     "enterprise",
-    "eyrus"
+    "eyrus",
+    "react",
+    "dashboard"
   ],
   "author": "Eyrus Team",
   "license": "MIT"
