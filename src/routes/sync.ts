@@ -5,8 +5,95 @@ import { logger, logError, logBusinessEvent } from '../utils/logger';
 const router = Router();
 
 /**
+ * POST /sync
+ * Trigger a sync operation for multiple NAICS codes
+ */
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const {
+      naicsCodes = ['236210', '236220', '237110', '237130', '237310', '237990'],
+      postedFrom = '2025-01-01',
+      postedTo = '2025-06-16',
+      ptype = 'a',
+      dryRun = false,
+    } = req.body;
+
+    // Validate required parameters
+    if (!postedFrom || !postedTo) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'postedFrom and postedTo are required parameters',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(postedFrom) || !dateRegex.test(postedTo)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Dates must be in YYYY-MM-DD format',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const syncOptions = {
+      naicsCodes,
+      postedFrom,
+      postedTo,
+      ptype,
+      dryRun: Boolean(dryRun),
+    };
+
+    logger.info('NAICS-based sync triggered', { 
+      syncOptions,
+      requestedBy: req.ip,
+    });
+
+    logBusinessEvent('naics_sync_triggered', {
+      syncOptions,
+      requestedBy: req.ip,
+    });
+
+    // Start the sync operation
+    const result = await samOpportunitiesService.syncOpportunitiesForNaicsCodes(
+      naicsCodes,
+      syncOptions
+    );
+
+    return res.json({
+      success: result.success,
+      message: result.success ? 'Sync completed successfully' : 'Sync completed with errors',
+      syncId: result.syncId,
+      recordsProcessed: result.recordsProcessed,
+      recordsCreated: result.recordsCreated,
+      recordsUpdated: result.recordsUpdated,
+      recordsFailed: result.recordsFailed,
+      errors: result.errors,
+      duration: result.duration,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logError(error, 'naics_sync_api_failed', {
+      body: req.body,
+      requestedBy: req.ip,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to start sync',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
  * POST /sync/manual
- * Trigger a manual sync operation
+ * Trigger a manual sync operation (legacy endpoint)
  */
 router.post('/manual', async (req: Request, res: Response) => {
   try {
@@ -73,14 +160,6 @@ router.post('/manual', async (req: Request, res: Response) => {
     // Start the sync operation (don't await to return response immediately)
     const syncPromise = samOpportunitiesService.syncOpportunities(syncOptions);
 
-    // Return immediately with sync ID
-    res.json({
-      success: true,
-      message: 'Manual sync started successfully',
-      syncOptions,
-      timestamp: new Date().toISOString(),
-    });
-
     // Log the result when sync completes
     syncPromise
       .then((result) => {
@@ -99,13 +178,21 @@ router.post('/manual', async (req: Request, res: Response) => {
         });
       });
 
+    // Return immediately with sync ID
+    return res.json({
+      success: true,
+      message: 'Manual sync started successfully',
+      syncOptions,
+      timestamp: new Date().toISOString(),
+    });
+
   } catch (error: any) {
     logError(error, 'manual_sync_api_failed', {
       body: req.body,
       requestedBy: req.ip,
     });
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to start manual sync',
       message: error.message,

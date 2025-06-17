@@ -87,7 +87,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     const opportunity = await samOpportunitiesService.getOpportunityById(id);
 
-    res.json({
+    return res.json({
       success: true,
       data: opportunity,
       timestamp: new Date().toISOString(),
@@ -100,7 +100,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       id: req.params.id,
     });
 
-    res.status(statusCode).json({
+    return res.status(statusCode).json({
       success: false,
       error: statusCode === 404 ? 'Not Found' : 'Internal Server Error',
       message: error.message,
@@ -110,34 +110,120 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /opportunities/stats
- * Get opportunity statistics
+ * GET /opportunities/naics/:naicsCode
+ * Get opportunities for a specific NAICS code
  */
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/naics/:naicsCode', async (req: Request, res: Response) => {
   try {
-    logger.info('Fetching opportunity statistics');
+    const { naicsCode } = req.params;
+    const {
+      limit = '50',
+      offset = '0',
+      postedFrom,
+      postedTo,
+      minAmount,
+      maxAmount,
+      searchTerm,
+    } = req.query;
 
-    // This would require implementing a getStatistics method in the service
-    // For now, return a placeholder response
-    const stats = {
-      totalOpportunities: 0,
-      totalByType: {},
-      totalByDepartment: {},
-      recentSyncStatus: {},
+    const parsedLimit = Math.min(parseInt(limit as string, 10) || 50, 1000);
+    const parsedOffset = Math.max(parseInt(offset as string, 10) || 0, 0);
+
+    const filters = {
+      naicsCode,
+      ...(postedFrom && { postedFrom: postedFrom as string }),
+      ...(postedTo && { postedTo: postedTo as string }),
+      ...(searchTerm && { searchTerm: searchTerm as string }),
+      ...(minAmount && { minAmount: parseFloat(minAmount as string) }),
+      ...(maxAmount && { maxAmount: parseFloat(maxAmount as string) }),
     };
+
+    logger.info('Fetching opportunities by NAICS code', { naicsCode, filters });
+
+    const result = await samOpportunitiesService.getOpportunitiesByNaics(
+      naicsCode,
+      filters,
+      parsedLimit,
+      parsedOffset
+    );
 
     res.json({
       success: true,
-      data: stats,
+      opportunities: result.opportunities,
+      total: result.total,
+      meta: {
+        naicsCode,
+        count: result.opportunities.length,
+        total: result.total,
+        limit: parsedLimit,
+        offset: parsedOffset,
+        filters,
+      },
       timestamp: new Date().toISOString(),
     });
 
   } catch (error: any) {
-    logError(error, 'get_opportunity_stats_api_failed');
+    logError(error, 'get_opportunities_by_naics_api_failed', {
+      naicsCode: req.params.naicsCode,
+      query: req.query,
+    });
 
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch opportunity statistics',
+      error: 'Failed to fetch opportunities by NAICS code',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
+ * POST /opportunities/:id/analyze
+ * Analyze a specific opportunity with AI
+ */
+router.post('/:id/analyze', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    logger.info('Analyzing opportunity with AI', { opportunityId: id });
+
+    // Get the opportunity first
+    const opportunity = await samOpportunitiesService.getOpportunityById(id);
+    if (!opportunity) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Opportunity not found',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Analyze with AI (implement this method in the service)
+    const analysisResult = await samOpportunitiesService.analyzeOpportunitiesWithAI(
+      opportunity.naicsCode,
+      1
+    );
+
+    res.json({
+      success: true,
+      analysis: analysisResult,
+      opportunity: {
+        id: opportunity.id,
+        opportunityId: opportunity.opportunityId,
+        title: opportunity.title,
+        naicsCode: opportunity.naicsCode,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logError(error, 'analyze_opportunity_api_failed', {
+      opportunityId: req.params.id,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to analyze opportunity',
       message: error.message,
       timestamp: new Date().toISOString(),
     });

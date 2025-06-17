@@ -22,6 +22,7 @@ const envSchema = Joi.object({
   // SAM.gov API
   SAM_API_BASE_URL: Joi.string().uri().required(),
   SAM_API_KEY: Joi.string().required(),
+  SAM_API_KEYS: Joi.string().optional(),
   SAM_RATE_LIMIT_PER_MINUTE: Joi.number().positive().default(60),
   SAM_REQUEST_TIMEOUT: Joi.number().positive().default(30000),
   SAM_MAX_RETRIES: Joi.number().min(0).default(3),
@@ -44,6 +45,23 @@ const envSchema = Joi.object({
   // Data Retention
   DATA_RETENTION_DAYS: Joi.number().positive().default(365),
   CLEANUP_INTERVAL_HOURS: Joi.number().positive().default(24),
+  
+  // Flowise AI
+  FLOWISE_API_URL: Joi.string().uri().required(),
+  FLOWISE_API_KEY: Joi.string().required(),
+  FLOWISE_TIMEOUT: Joi.number().positive().default(30000),
+  
+  // Target NAICS Codes
+  TARGET_NAICS_CODES: Joi.string().default('236210,236220,237110,237130,237310,237990'),
+  
+  // Opportunities Date Range
+  OPPORTUNITIES_DATE_FROM: Joi.string().default('2025-01-01'),
+  OPPORTUNITIES_DATE_TO: Joi.string().default('2025-06-16'),
+  
+  // Sales Filtering
+  SALES_MIN_CONTRACT_VALUE: Joi.number().positive().default(100000),
+  SALES_MAX_CONTRACT_VALUE: Joi.number().positive().default(50000000),
+  SALES_PREFERRED_DEPARTMENTS: Joi.string().default('Department of Defense,Department of Veterans Affairs,General Services Administration,Army Corps of Engineers'),
 }).unknown();
 
 const { error, value: envVars } = envSchema.validate(process.env);
@@ -76,6 +94,7 @@ export const config = {
   sam: {
     apiBaseUrl: envVars.SAM_API_BASE_URL,
     apiKey: envVars.SAM_API_KEY,
+    apiKeys: envVars.SAM_API_KEYS ? envVars.SAM_API_KEYS.split(',').map((key: string) => key.trim()) : [envVars.SAM_API_KEY],
     rateLimitPerMinute: envVars.SAM_RATE_LIMIT_PER_MINUTE,
     requestTimeout: envVars.SAM_REQUEST_TIMEOUT,
     maxRetries: envVars.SAM_MAX_RETRIES,
@@ -98,6 +117,21 @@ export const config = {
   dataRetention: {
     retentionDays: envVars.DATA_RETENTION_DAYS,
     cleanupIntervalHours: envVars.CLEANUP_INTERVAL_HOURS,
+  },
+  flowise: {
+    apiUrl: envVars.FLOWISE_API_URL,
+    apiKey: envVars.FLOWISE_API_KEY,
+    timeout: envVars.FLOWISE_TIMEOUT,
+  },
+  business: {
+    targetNaicsCodes: envVars.TARGET_NAICS_CODES.split(',').map((code: string) => code.trim()),
+    opportunitiesDateFrom: envVars.OPPORTUNITIES_DATE_FROM,
+    opportunitiesDateTo: envVars.OPPORTUNITIES_DATE_TO,
+  },
+  sales: {
+    minContractValue: envVars.SALES_MIN_CONTRACT_VALUE,
+    maxContractValue: envVars.SALES_MAX_CONTRACT_VALUE,
+    preferredDepartments: envVars.SALES_PREFERRED_DEPARTMENTS.split(',').map((dept: string) => dept.trim()),
   },
 };
 

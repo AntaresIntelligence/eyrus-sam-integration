@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('ts-node/register');
 
 module.exports = {
   development: {
@@ -9,6 +10,7 @@ module.exports = {
       database: process.env.DB_NAME || 'eyrus_sam',
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'password',
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     },
     pool: {
       min: parseInt(process.env.DB_POOL_MIN || '2'),
@@ -17,6 +19,7 @@ module.exports = {
     migrations: {
       tableName: 'knex_migrations',
       directory: './src/database/migrations',
+      extension: 'ts',
     },
     seeds: {
       directory: './src/database/seeds',
@@ -39,6 +42,7 @@ module.exports = {
     migrations: {
       tableName: 'knex_migrations',
       directory: './src/database/migrations',
+      extension: 'ts',
     },
     acquireConnectionTimeout: 60000,
     createTimeoutMillis: 30000,
@@ -64,6 +68,7 @@ module.exports = {
     migrations: {
       tableName: 'knex_migrations',
       directory: './src/database/migrations',
+      extension: 'ts',
     },
     seeds: {
       directory: './src/database/seeds',

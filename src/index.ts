@@ -2,6 +2,7 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cors from 'cors';
+import path from 'path';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import cron from 'node-cron';
 
@@ -15,10 +16,13 @@ import { healthCheckService } from './services/healthCheckService';
 import { opportunitiesRouter } from './routes/opportunities';
 import { healthRouter } from './routes/health';
 import { syncRouter } from './routes/sync';
+import { statisticsRouter } from './routes/statistics';
+import { aiRouter } from './routes/ai';
+import { salesRouter } from './routes/sales';
 
 class EyrusSamIntegrationApp {
   private app: Application;
-  private rateLimiter: RateLimiterMemory;
+  private rateLimiter!: RateLimiterMemory;
   private server: any;
   private isShuttingDown = false;
 
@@ -36,7 +40,6 @@ class EyrusSamIntegrationApp {
    */
   private initializeRateLimiter(): void {
     this.rateLimiter = new RateLimiterMemory({
-      keyGenerator: (req) => req.ip,
       points: config.rateLimit.maxRequests,
       duration: config.rateLimit.windowMs / 1000,
       blockDuration: 60, // Block for 60 seconds if exceeded
@@ -52,9 +55,11 @@ class EyrusSamIntegrationApp {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", "data:", "https:"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+          connectSrc: ["'self'"],
         },
       },
     }));
@@ -68,6 +73,9 @@ class EyrusSamIntegrationApp {
     // Compression
     this.app.use(compression());
 
+    // Static files for frontend
+    this.app.use(express.static(path.join(__dirname, '../public')));
+
     // Body parsing
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -75,9 +83,9 @@ class EyrusSamIntegrationApp {
     // Rate limiting middleware
     this.app.use(async (req: Request, res: Response, next: NextFunction) => {
       try {
-        await this.rateLimiter.consume(req.ip);
+        await this.rateLimiter.consume(req.ip || 'unknown');
         next();
-      } catch (rateLimitRes) {
+      } catch (rateLimitRes: any) {
         const remainingTime = Math.round(rateLimitRes.msBeforeNext / 1000) || 1;
         
         logger.warn('Rate limit exceeded', {
@@ -88,10 +96,10 @@ class EyrusSamIntegrationApp {
         });
 
         res.set({
-          'Retry-After': remainingTime,
-          'X-RateLimit-Limit': config.rateLimit.maxRequests,
-          'X-RateLimit-Remaining': rateLimitRes.remainingPoints || 0,
-          'X-RateLimit-Reset': new Date(Date.now() + rateLimitRes.msBeforeNext),
+          'Retry-After': remainingTime.toString(),
+          'X-RateLimit-Limit': config.rateLimit.maxRequests.toString(),
+          'X-RateLimit-Remaining': (rateLimitRes.remainingPoints || 0).toString(),
+          'X-RateLimit-Reset': new Date(Date.now() + rateLimitRes.msBeforeNext).toISOString(),
         });
 
         res.status(429).json({
@@ -136,18 +144,48 @@ class EyrusSamIntegrationApp {
     // Main API routes
     this.app.use(`${apiPrefix}/opportunities`, opportunitiesRouter);
     this.app.use(`${apiPrefix}/sync`, syncRouter);
+    this.app.use(`${apiPrefix}/statistics`, statisticsRouter);
+    this.app.use(`${apiPrefix}/ai`, aiRouter);
+    this.app.use(`${apiPrefix}/sales`, salesRouter);
 
-    // Root endpoint
+    // Simplified API routes (for frontend compatibility)
+    this.app.use('/api/opportunities', opportunitiesRouter);
+    this.app.use('/api/sync', syncRouter);
+    this.app.use('/api/statistics', statisticsRouter);
+    this.app.use('/api/ai', aiRouter);
+    this.app.use('/api/sales', salesRouter);
+
+    // Dashboard routes (serve the frontend)
+    this.app.get('/dashboard', (req: Request, res: Response) => {
+      res.sendFile(path.join(__dirname, '../public/index.html'));
+    });
+
+    this.app.get('/sales', (req: Request, res: Response) => {
+      res.sendFile(path.join(__dirname, '../public/sales.html'));
+    });
+
+    // Root endpoint - redirect to sales dashboard or serve API info
     this.app.get('/', (req: Request, res: Response) => {
+      // If request accepts HTML, redirect to sales dashboard
+      if (req.accepts('html')) {
+        return res.redirect('/sales');
+      }
+      
+      // Otherwise, serve API info
       res.json({
         name: 'Eyrus SAM Integration API',
         version: config.server.apiVersion,
         status: 'operational',
         timestamp: new Date().toISOString(),
         endpoints: {
+          salesDashboard: '/sales',
+          allOpportunities: '/dashboard', 
           health: '/health',
           opportunities: `${apiPrefix}/opportunities`,
+          sales: `${apiPrefix}/sales`,
           sync: `${apiPrefix}/sync`,
+          statistics: `${apiPrefix}/statistics`,
+          ai: `${apiPrefix}/ai`,
         },
       });
     });
@@ -241,8 +279,8 @@ class EyrusSamIntegrationApp {
         thirtyDaysAgo.setDate(today.getDate() - 30);
 
         const result = await samOpportunitiesService.syncOpportunities({
-          postedFrom: thirtyDaysAgo.toISOString().split('T')[0],
-          postedTo: today.toISOString().split('T')[0],
+          postedFrom: thirtyDaysAgo.toISOString().split('T')[0]!,
+          postedTo: today.toISOString().split('T')[0]!,
           ptype: 'a', // Award notices
           ncode: '236220', // NAICS code from requirements
         });

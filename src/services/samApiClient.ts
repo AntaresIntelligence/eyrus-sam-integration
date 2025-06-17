@@ -84,17 +84,21 @@ export class SamApiClient {
   private readonly client: AxiosInstance;
   private readonly rateLimiter: RateLimiterMemory;
   private readonly apiKeyHash: string;
+  private readonly apiKeys: string[];
+  private currentKeyIndex: number = 0;
 
   constructor() {
+    // Set up API keys for rotation
+    this.apiKeys = config.sam.apiKeys || [config.sam.apiKey];
+    
     // Create API key hash for rate limiting tracking
     this.apiKeyHash = createHash('sha256')
-      .update(config.sam.apiKey)
+      .update(this.getCurrentApiKey())
       .digest('hex')
       .substring(0, 16);
 
     // Initialize rate limiter
     this.rateLimiter = new RateLimiterMemory({
-      keyGenerator: () => this.apiKeyHash,
       points: config.sam.rateLimitPerMinute,
       duration: 60, // 60 seconds
       blockDuration: 60, // Block for 60 seconds if exceeded
@@ -141,11 +145,10 @@ export class SamApiClient {
         // Check rate limit before making request
         try {
           await this.rateLimiter.consume(this.apiKeyHash);
-        } catch (rateLimitRes) {
+        } catch (rateLimitRes: any) {
           const waitTime = Math.round(rateLimitRes.msBeforeNext || 1000);
           logger.warn('SAM API rate limit exceeded, waiting', {
             waitTimeMs: waitTime,
-            totalHits: rateLimitRes.totalHits,
             remainingPoints: rateLimitRes.remainingPoints,
           });
           
@@ -200,16 +203,71 @@ export class SamApiClient {
   }
 
   /**
+   * Get current API key
+   */
+  private getCurrentApiKey(): string {
+    return this.apiKeys[this.currentKeyIndex];
+  }
+
+  /**
+   * Rotate to next API key
+   */
+  private rotateApiKey(): void {
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+    logger.info('Rotated to next API key', { 
+      keyIndex: this.currentKeyIndex,
+      totalKeys: this.apiKeys.length 
+    });
+  }
+
+  /**
+   * Format date from YYYY-MM-DD to MM/dd/yyyy format for SAM.gov API
+   */
+  private formatDateForSamApi(dateString: string): string {
+    if (!dateString) return dateString;
+    
+    // If already in MM/dd/yyyy format, return as is
+    if (dateString.includes('/')) return dateString;
+    
+    // Convert from YYYY-MM-DD to MM/dd/yyyy
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      logger.warn('Invalid date format provided', { dateString });
+      return dateString;
+    }
+    
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${month}/${day}/${year}`;
+  }
+
+  /**
    * Search for opportunities using the SAM.gov API
    */
   async searchOpportunities(params: Partial<SamApiSearchParams>): Promise<SamApiResponse> {
     try {
       const searchParams: SamApiSearchParams = {
-        api_key: config.sam.apiKey,
+        api_key: this.getCurrentApiKey(),
         limit: 1000,
         offset: 0,
         ...params,
       };
+
+      // Format dates for SAM.gov API
+      if (searchParams.postedFrom) {
+        searchParams.postedFrom = this.formatDateForSamApi(searchParams.postedFrom);
+      }
+      if (searchParams.postedTo) {
+        searchParams.postedTo = this.formatDateForSamApi(searchParams.postedTo);
+      }
+      if (searchParams.rdlfrom) {
+        searchParams.rdlfrom = this.formatDateForSamApi(searchParams.rdlfrom);
+      }
+      if (searchParams.rdlto) {
+        searchParams.rdlto = this.formatDateForSamApi(searchParams.rdlto);
+      }
 
       logger.info('Searching SAM opportunities', {
         params: this.sanitizeParams(searchParams),
@@ -230,21 +288,43 @@ export class SamApiClient {
         currentPage: response.data.pageNumber,
       });
 
+      // Transform opportunities data to match interface
+      if (response.data.opportunitiesData) {
+        response.data.opportunitiesData = response.data.opportunitiesData.map(this.transformApiResponse);
+      }
+
       return response.data;
     } catch (error: any) {
+      // Check if it's a rate limit error and rotate key
+      if (error.response?.status === 429 && this.apiKeys.length > 1) {
+        logger.warn('Rate limit hit, rotating API key', {
+          status: error.response.status,
+          currentKeyIndex: this.currentKeyIndex,
+        });
+        this.rotateApiKey();
+        
+        // Retry with new key
+        const retryParams: SamApiSearchParams = {
+          ...params,
+          api_key: this.getCurrentApiKey(),
+        };
+        return this.searchOpportunities(retryParams);
+      }
+
       logger.error('Failed to search SAM opportunities', {
         error: error.message,
         status: error.response?.status,
         statusText: error.response?.statusText,
         responseData: error.response?.data,
         params: this.sanitizeParams(params),
+        currentKeyIndex: this.currentKeyIndex,
       });
 
       // Re-throw with enhanced error information
       const enhancedError = new Error(
         `SAM.gov API search failed: ${error.message}`
       );
-      enhancedError.cause = error;
+      (enhancedError as any).cause = error;
       throw enhancedError;
     }
   }
@@ -259,7 +339,7 @@ export class SamApiClient {
       const response: AxiosResponse<{ opportunitiesData: SamOpportunity[] }> = 
         await this.client.get(`/${opportunityId}`, {
           params: {
-            api_key: config.sam.apiKey,
+            api_key: this.getCurrentApiKey(),
           },
         });
 
@@ -311,8 +391,8 @@ export class SamApiClient {
     try {
       do {
         const searchParams: Partial<SamApiSearchParams> = {
-          postedFrom,
-          postedTo,
+          postedFrom: this.formatDateForSamApi(postedFrom),
+          postedTo: this.formatDateForSamApi(postedTo),
           limit: batchSize,
           offset: currentOffset,
           ...additionalParams,
@@ -326,7 +406,9 @@ export class SamApiClient {
         }
 
         if (response.opportunitiesData && response.opportunitiesData.length > 0) {
-          allOpportunities.push(...response.opportunitiesData);
+          // Transform raw API response to SamOpportunity interface
+          const transformedOpportunities = response.opportunitiesData.map(this.transformApiResponse);
+          allOpportunities.push(...transformedOpportunities);
           processedRecords += response.opportunitiesData.length;
           
           logger.info('Batch fetched successfully', {
@@ -376,10 +458,16 @@ export class SamApiClient {
       logger.info('Testing SAM.gov API connection');
 
       // Test with a minimal search to verify connectivity
+      const today = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      
       const testParams: Partial<SamApiSearchParams> = {
         limit: 1,
         offset: 0,
         ptype: 'a', // Award notices
+        postedFrom: this.formatDateForSamApi(thirtyDaysAgo.toISOString().split('T')[0]!),
+        postedTo: this.formatDateForSamApi(today.toISOString().split('T')[0]!),
       };
 
       const response = await this.searchOpportunities(testParams);
@@ -437,7 +525,7 @@ export class SamApiClient {
       return {
         remainingRequests: rateLimitInfo ? rateLimitInfo.remainingPoints || 0 : config.sam.rateLimitPerMinute,
         resetTime: new Date(Date.now() + (rateLimitInfo?.msBeforeNext || 0)),
-        totalRequests: rateLimitInfo ? rateLimitInfo.totalHits || 0 : 0,
+        totalRequests: rateLimitInfo ? (rateLimitInfo as any).totalHits || 0 : 0,
       };
     } catch (error) {
       logger.error('Failed to get rate limit status', { error });
@@ -448,6 +536,56 @@ export class SamApiClient {
         totalRequests: 0,
       };
     }
+  }
+
+  /**
+   * Transform raw API response to SamOpportunity interface
+   */
+  private transformApiResponse = (apiData: any): SamOpportunity => {
+    const award = apiData.award || {};
+    const awardee = award.awardee || {};
+    
+    return {
+      opportunityId: apiData.noticeId, // Use noticeId as primary ID
+      noticeId: apiData.noticeId,
+      title: apiData.title,
+      description: apiData.description,
+      type: apiData.type,
+      baseType: apiData.baseType,
+      archiveType: apiData.archiveType,
+      archiveDate: apiData.archiveDate,
+      classificationCode: apiData.classificationCode,
+      naicsCode: apiData.naicsCode,
+      setAsideCode: apiData.typeOfSetAside,
+      setAside: apiData.typeOfSetAsideDescription,
+      department: this.extractDepartmentName(apiData.fullParentPathName),
+      subTier: apiData.fullParentPathName,
+      office: apiData.organizationType,
+      solicitationNumber: apiData.solicitationNumber,
+      postedDate: apiData.postedDate,
+      responseDeadLine: apiData.responseDeadLine,
+      updatedDate: apiData.updatedDate,
+      contactInfo: apiData.pointOfContact || [],
+      attachments: apiData.resourceLinks || [],
+      awardNumber: award.number,
+      awardAmount: award.amount ? parseFloat(award.amount) : undefined,
+      awardeeName: awardee.name,
+      awardeeDuns: awardee.ueiSAM,
+      awardeeCage: awardee.cageCode,
+      awardeeInfo: awardee,
+      samUrl: apiData.uiLink,
+      relatedNotices: apiData.links || [],
+      rawData: apiData,
+    };
+  };
+
+  /**
+   * Extract department name from fullParentPathName
+   */
+  private extractDepartmentName(fullParentPathName?: string): string {
+    if (!fullParentPathName) return '';
+    const pathParts = fullParentPathName.split('.');
+    return pathParts.length > 0 ? pathParts[0] : '';
   }
 
   /**

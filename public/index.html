@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eyrus SAM Opportunities Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #2d3748;
+        }
+
+        .dashboard-container {
+            display: flex;
+            min-height: 100vh;
+            background: #f7fafc;
+            margin: 20px;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1" fill="rgba(255,255,255,0.03)"/><circle cx="80" cy="40" r="1" fill="rgba(255,255,255,0.03)"/><circle cx="40" cy="80" r="1" fill="rgba(255,255,255,0.03)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+        }
+
+        .logo-section {
+            padding: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .nav-section {
+            padding: 24px 0;
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+            padding: 0 24px;
+        }
+
+        .naics-filter {
+            margin-bottom: 32px;
+        }
+
+        .naics-list {
+            list-style: none;
+        }
+
+        .naics-item {
+            margin-bottom: 4px;
+        }
+
+        .naics-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            color: #cbd5e0;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+            font-weight: 500;
+        }
+
+        .naics-link:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+            border-left-color: #667eea;
+        }
+
+        .naics-link.active {
+            background: rgba(102, 126, 234, 0.1);
+            color: #e2e8f0;
+            border-left-color: #667eea;
+        }
+
+        .naics-info {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .naics-code {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .naics-desc {
+            font-size: 11px;
+            color: #a0aec0;
+            margin-top: 2px;
+        }
+
+        .naics-count {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .stats-section {
+            padding: 0 24px 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 1;
+        }
+
+        .stats-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            color: #cbd5e0;
+        }
+
+        .stat-value {
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+        }
+
+        .header {
+            background: #ffffff;
+            padding: 24px 32px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            color: #718096;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #edf2f7;
+            border-color: #cbd5e0;
+        }
+
+        .filters-bar {
+            background: #f8fafc;
+            padding: 20px 32px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #4a5568;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-input {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            min-width: 150px;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+        }
+
+        .content-area {
+            flex: 1;
+            padding: 32px;
+            overflow-y: auto;
+        }
+
+        .opportunities-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        }
+
+        .opportunity-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .opportunity-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .opportunity-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .opportunity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .opportunity-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .opportunity-meta {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .meta-badge {
+            background: #edf2f7;
+            color: #4a5568;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .meta-badge.amount {
+            background: #f0fff4;
+            color: #22543d;
+        }
+
+        .meta-badge.deadline {
+            background: #fffaf0;
+            color: #9c4221;
+        }
+
+        .opportunity-description {
+            color: #718096;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 16px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .opportunity-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .opportunity-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .opportunity-link:hover {
+            color: #5a67d8;
+        }
+
+        .ai-button {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .ai-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+        }
+
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            color: #cbd5e0;
+            margin-bottom: 16px;
+        }
+
+        /* AI Assistant Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .ai-modal {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+        }
+
+        .ai-modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ai-modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .ai-modal-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .ai-chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 400px;
+        }
+
+        .ai-chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .ai-message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.5;
+        }
+
+        .ai-message.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .ai-message.assistant {
+            align-self: flex-start;
+            background: white;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .ai-message.loading {
+            align-self: flex-start;
+            background: white;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .ai-input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .ai-input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .ai-input {
+            flex: 1;
+            min-height: 44px;
+            max-height: 120px;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: none;
+            overflow-y: auto;
+        }
+
+        .ai-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .ai-send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            min-width: 80px;
+        }
+
+        .ai-send-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .ai-send-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .ai-quick-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .quick-action-btn {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-action-btn:hover {
+            background: #e2e8f0;
+            border-color: #cbd5e0;
+        }
+
+        .insights-modal {
+            max-width: 1000px;
+        }
+
+        .insights-content {
+            padding: 24px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .insights-content h3 {
+            color: #2d3748;
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+
+        .insights-content p {
+            line-height: 1.6;
+            color: #4a5568;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                margin: 10px;
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+
+            .content-area {
+                padding: 16px;
+            }
+
+            .opportunities-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filters-bar {
+                padding: 16px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .header {
+                padding: 16px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+
+            .ai-modal {
+                width: 95%;
+                max-height: 90vh;
+            }
+
+            .ai-input-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .ai-quick-actions {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo-section">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <span>Eyrus SAM</span>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="naics-filter">
+                    <div class="nav-title">Industry Codes</div>
+                    <ul class="naics-list">
+                        <li class="naics-item">
+                            <a href="#" class="naics-link active" data-naics="all">
+                                <div class="naics-info">
+                                    <div class="naics-code">All Industries</div>
+                                    <div class="naics-desc">View all opportunities</div>
+                                </div>
+                                <span class="naics-count" id="count-all">--</span>
+                            </a>
+                        </li>
+                        <li class="naics-item">
+                            <a href="#" class="naics-link" data-naics="236210">
+                                <div class="naics-info">
+                                    <div class="naics-code">236210</div>
+                                    <div class="naics-desc">Industrial Building Construction</div>
+                                </div>
+                                <span class="naics-count" id="count-236210">--</span>
+                            </a>
+                        </li>
+                        <li class="naics-item">
+                            <a href="#" class="naics-link" data-naics="236220">
+                                <div class="naics-info">
+                                    <div class="naics-code">236220</div>
+                                    <div class="naics-desc">Commercial & Institutional Building</div>
+                                </div>
+                                <span class="naics-count" id="count-236220">--</span>
+                            </a>
+                        </li>
+                        <li class="naics-item">
+                            <a href="#" class="naics-link" data-naics="237110">
+                                <div class="naics-info">
+                                    <div class="naics-code">237110</div>
+                                    <div class="naics-desc">Water & Sewer Line Construction</div>
+                                </div>
+                                <span class="naics-count" id="count-237110">--</span>
+                            </a>
+                        </li>
+                        <li class="naics-item">
+                            <a href="#" class="naics-link" data-naics="237130">
+                                <div class="naics-info">
+                                    <div class="naics-code">237130</div>
+                                    <div class="naics-desc">Power & Communication Line</div>
+                                </div>
+                                <span class="naics-count" id="count-237130">--</span>
+                            </a>
+                        </li>
+                        <li class="naics-item">
+                            <a href="#" class="naics-link" data-naics="237310">
+                                <div class="naics-info">
+                                    <div class="naics-code">237310</div>
+                                    <div class="naics-desc">Highway, Street & Bridge</div>
+                                </div>
+                                <span class="naics-count" id="count-237310">--</span>
+                            </a>
+                        </li>
+                        <li class="naics-item">
+                            <a href="#" class="naics-link" data-naics="237990">
+                                <div class="naics-info">
+                                    <div class="naics-code">237990</div>
+                                    <div class="naics-desc">Other Heavy & Civil Engineering</div>
+                                </div>
+                                <span class="naics-count" id="count-237990">--</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <div class="stats-title">Quick Stats</div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Value</span>
+                    <span class="stat-value" id="total-value">$--</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg. Award</span>
+                    <span class="stat-value" id="avg-award">$--</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Last Updated</span>
+                    <span class="stat-value" id="last-updated">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <div>
+                    <h1 class="header-title">Government Contracting Opportunities</h1>
+                    <p class="header-subtitle">Discover construction opportunities from SAM.gov for Eyrus prospects</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="syncOpportunities()">
+                        <i class="fas fa-sync-alt"></i>
+                        Sync Data
+                    </button>
+                    <button class="btn btn-secondary" onclick="generateInsights()">
+                        <i class="fas fa-chart-line"></i>
+                        AI Insights
+                    </button>
+                    <button class="btn btn-primary" onclick="openAiAssistant()">
+                        <i class="fas fa-robot"></i>
+                        AI Assistant
+                    </button>
+                </div>
+            </div>
+
+            <div class="filters-bar">
+                <div class="search-box">
+                    <input type="text" class="search-input" placeholder="Search opportunities by title, department, or solicitation number..." id="search-input">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Date From</label>
+                    <input type="date" class="filter-input" id="date-from" value="2025-01-01">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Date To</label>
+                    <input type="date" class="filter-input" id="date-to" value="2025-06-16">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Min Amount</label>
+                    <input type="number" class="filter-input" placeholder="$0" id="min-amount">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Max Amount</label>
+                    <input type="number" class="filter-input" placeholder="No limit" id="max-amount">
+                </div>
+            </div>
+
+            <div class="content-area">
+                <div id="opportunities-container">
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p>Loading opportunities...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Assistant Modal -->
+    <div class="modal-overlay" id="ai-modal-overlay">
+        <div class="ai-modal">
+            <div class="ai-modal-header">
+                <div class="ai-modal-title">
+                    <i class="fas fa-robot"></i>
+                    Eyrus AI Assistant
+                </div>
+                <button class="modal-close" onclick="closeAiAssistant()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="ai-modal-body">
+                <div class="ai-chat-container">
+                    <div class="ai-chat-messages" id="ai-chat-messages">
+                        <div class="ai-message assistant">
+                            Hello! I'm your AI assistant for government contracting opportunities. I can help you analyze opportunities, generate insights, and answer questions about the construction contracts. How can I assist you today?
+                        </div>
+                    </div>
+                    <div class="ai-input-area">
+                        <div class="ai-quick-actions">
+                            <button class="quick-action-btn" onclick="sendQuickQuestion('What are the most promising opportunities for Eyrus this week?')">
+                                Weekly Opportunities
+                            </button>
+                            <button class="quick-action-btn" onclick="sendQuickQuestion('Analyze market trends in construction contracting')">
+                                Market Trends
+                            </button>
+                            <button class="quick-action-btn" onclick="sendQuickQuestion('What NAICS codes should Eyrus focus on?')">
+                                NAICS Focus
+                            </button>
+                            <button class="quick-action-btn" onclick="sendQuickQuestion('Compare recent opportunities by department')">
+                                Department Analysis
+                            </button>
+                        </div>
+                        <div class="ai-input-container">
+                            <textarea 
+                                class="ai-input" 
+                                id="ai-input" 
+                                placeholder="Ask me anything about opportunities, market trends, or get analysis recommendations..."
+                                rows="1"
+                            ></textarea>
+                            <button class="ai-send-btn" id="ai-send-btn" onclick="sendAiMessage()">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insights Modal -->
+    <div class="modal-overlay" id="insights-modal-overlay">
+        <div class="ai-modal insights-modal">
+            <div class="ai-modal-header">
+                <div class="ai-modal-title">
+                    <i class="fas fa-chart-line"></i>
+                    AI Market Insights
+                </div>
+                <button class="modal-close" onclick="closeInsights()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="ai-modal-body">
+                <div class="insights-content" id="insights-content">
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p>Generating AI insights...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

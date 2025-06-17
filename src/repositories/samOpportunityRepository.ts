@@ -52,6 +52,8 @@ export interface OpportunityFilters {
   opportunityType?: string;
   searchTerm?: string;
   syncStatus?: string;
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 export class SamOpportunityRepository {
@@ -66,7 +68,40 @@ export class SamOpportunityRepository {
     try {
       const [result] = await db(this.tableName)
         .insert({
-          ...opportunity,
+          opportunity_id: opportunity.opportunityId,
+          notice_id: opportunity.noticeId,
+          title: opportunity.title,
+          description: opportunity.description,
+          opportunity_type: opportunity.opportunityType,
+          base_type: opportunity.baseType,
+          archive_type: opportunity.archiveType,
+          archive_date: opportunity.archiveDate,
+          classification_code: opportunity.classificationCode,
+          naics_code: opportunity.naicsCode,
+          set_aside_code: opportunity.setAsideCode,
+          set_aside: opportunity.setAside,
+          department: opportunity.department,
+          sub_tier: opportunity.subTier,
+          office: opportunity.office,
+          solicitation_number: opportunity.solicitationNumber,
+          posted_date: opportunity.postedDate,
+          response_deadline: opportunity.responseDeadline,
+          updated_date: opportunity.updatedDate,
+          contact_info: opportunity.contactInfo,
+          attachments: opportunity.attachments,
+          award_number: opportunity.awardNumber,
+          award_amount: opportunity.awardAmount,
+          awardee_name: opportunity.awardeeName,
+          awardee_duns: opportunity.awardeeDuns,
+          awardee_cage: opportunity.awardeeCage,
+          awardee_info: opportunity.awardeeInfo,
+          sam_url: opportunity.samUrl,
+          related_notices: opportunity.relatedNotices,
+          raw_data: opportunity.rawData,
+          data_source: opportunity.dataSource,
+          sync_status: opportunity.syncStatus || 'pending',
+          sync_error: opportunity.syncError,
+          last_synced_at: opportunity.lastSyncedAt,
           created_at: new Date(),
           updated_at: new Date(),
         })
@@ -94,12 +129,47 @@ export class SamOpportunityRepository {
     const startTime = process.hrtime();
     
     try {
+      // Convert camelCase to snake_case for database
+      const dbUpdates: any = { updated_at: new Date() };
+      
+      if (updates.opportunityId !== undefined) dbUpdates.opportunity_id = updates.opportunityId;
+      if (updates.noticeId !== undefined) dbUpdates.notice_id = updates.noticeId;
+      if (updates.title !== undefined) dbUpdates.title = updates.title;
+      if (updates.description !== undefined) dbUpdates.description = updates.description;
+      if (updates.opportunityType !== undefined) dbUpdates.opportunity_type = updates.opportunityType;
+      if (updates.baseType !== undefined) dbUpdates.base_type = updates.baseType;
+      if (updates.archiveType !== undefined) dbUpdates.archive_type = updates.archiveType;
+      if (updates.archiveDate !== undefined) dbUpdates.archive_date = updates.archiveDate;
+      if (updates.classificationCode !== undefined) dbUpdates.classification_code = updates.classificationCode;
+      if (updates.naicsCode !== undefined) dbUpdates.naics_code = updates.naicsCode;
+      if (updates.setAsideCode !== undefined) dbUpdates.set_aside_code = updates.setAsideCode;
+      if (updates.setAside !== undefined) dbUpdates.set_aside = updates.setAside;
+      if (updates.department !== undefined) dbUpdates.department = updates.department;
+      if (updates.subTier !== undefined) dbUpdates.sub_tier = updates.subTier;
+      if (updates.office !== undefined) dbUpdates.office = updates.office;
+      if (updates.solicitationNumber !== undefined) dbUpdates.solicitation_number = updates.solicitationNumber;
+      if (updates.postedDate !== undefined) dbUpdates.posted_date = updates.postedDate;
+      if (updates.responseDeadline !== undefined) dbUpdates.response_deadline = updates.responseDeadline;
+      if (updates.updatedDate !== undefined) dbUpdates.updated_date = updates.updatedDate;
+      if (updates.contactInfo !== undefined) dbUpdates.contact_info = updates.contactInfo;
+      if (updates.attachments !== undefined) dbUpdates.attachments = updates.attachments;
+      if (updates.awardNumber !== undefined) dbUpdates.award_number = updates.awardNumber;
+      if (updates.awardAmount !== undefined) dbUpdates.award_amount = updates.awardAmount;
+      if (updates.awardeeName !== undefined) dbUpdates.awardee_name = updates.awardeeName;
+      if (updates.awardeeDuns !== undefined) dbUpdates.awardee_duns = updates.awardeeDuns;
+      if (updates.awardeeCage !== undefined) dbUpdates.awardee_cage = updates.awardeeCage;
+      if (updates.awardeeInfo !== undefined) dbUpdates.awardee_info = updates.awardeeInfo;
+      if (updates.samUrl !== undefined) dbUpdates.sam_url = updates.samUrl;
+      if (updates.relatedNotices !== undefined) dbUpdates.related_notices = updates.relatedNotices;
+      if (updates.rawData !== undefined) dbUpdates.raw_data = updates.rawData;
+      if (updates.dataSource !== undefined) dbUpdates.data_source = updates.dataSource;
+      if (updates.syncStatus !== undefined) dbUpdates.sync_status = updates.syncStatus;
+      if (updates.syncError !== undefined) dbUpdates.sync_error = updates.syncError;
+      if (updates.lastSyncedAt !== undefined) dbUpdates.last_synced_at = updates.lastSyncedAt;
+
       const affectedRows = await db(this.tableName)
         .where('id', id)
-        .update({
-          ...updates,
-          updated_at: new Date(),
-        });
+        .update(dbUpdates);
 
       const duration = process.hrtime(startTime);
       logDatabaseOperation('UPDATE', this.tableName, affectedRows, duration[0] * 1000 + duration[1] / 1000000, {
@@ -219,6 +289,14 @@ export class SamOpportunityRepository {
         });
       }
 
+      if (filters.minAmount) {
+        query = query.where('award_amount', '>=', filters.minAmount);
+      }
+
+      if (filters.maxAmount) {
+        query = query.where('award_amount', '<=', filters.maxAmount);
+      }
+
       // Apply pagination
       if (filters.offset) {
         query = query.offset(filters.offset);
@@ -290,8 +368,16 @@ export class SamOpportunityRepository {
         });
       }
 
+      if (filters.minAmount) {
+        query = query.where('award_amount', '>=', filters.minAmount);
+      }
+
+      if (filters.maxAmount) {
+        query = query.where('award_amount', '<=', filters.maxAmount);
+      }
+
       const result = await query.count('* as count').first();
-      return parseInt(result?.count || '0', 10);
+      return parseInt(String(result?.count || '0'), 10);
     } catch (error: any) {
       logger.error('Failed to count opportunities', {
         error: error.message,
@@ -371,17 +457,17 @@ export class SamOpportunityRepository {
       ]);
 
       return {
-        totalOpportunities: parseInt(totalResult?.count || '0', 10),
+        totalOpportunities: parseInt(String(totalResult?.count || '0'), 10),
         totalByType: byTypeResult.reduce((acc, row) => {
-          acc[row.opportunity_type || 'Unknown'] = parseInt(row.count, 10);
+          acc[row.opportunity_type || 'Unknown'] = parseInt(String(row.count), 10);
           return acc;
         }, {}),
         totalByDepartment: byDepartmentResult.reduce((acc, row) => {
-          acc[row.department] = parseInt(row.count, 10);
+          acc[row.department] = parseInt(String(row.count), 10);
           return acc;
         }, {}),
         recentSyncStatus: syncStatusResult.reduce((acc, row) => {
-          acc[row.sync_status || 'Unknown'] = parseInt(row.count, 10);
+          acc[row.sync_status || 'Unknown'] = parseInt(String(row.count), 10);
           return acc;
         }, {}),
       };
@@ -421,7 +507,7 @@ export class SamOpportunityRepository {
       contactInfo: row.contact_info,
       attachments: row.attachments,
       awardNumber: row.award_number,
-      awardAmount: row.award_amount ? parseFloat(row.award_amount) : null,
+      awardAmount: row.award_amount ? parseFloat(String(row.award_amount)) : undefined,
       awardeeName: row.awardee_name,
       awardeeDuns: row.awardee_duns,
       awardeeCage: row.awardee_cage,

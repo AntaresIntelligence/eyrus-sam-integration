@@ -1,6 +1,8 @@
 import { samApiClient, SamOpportunity, SamApiSearchParams } from './samApiClient';
 import { SamOpportunityRepository } from '../repositories/samOpportunityRepository';
 import { SamSyncLogRepository } from '../repositories/samSyncLogRepository';
+import { naicsOpportunitiesRepository, NaicsOpportunity } from '../repositories/naicsOpportunitiesRepository';
+import { flowiseAiService } from './flowiseAiService';
 import { logger, logSyncOperation, logBusinessEvent, logError } from '../utils/logger';
 import { config } from '../config';
 import { v4 as uuidv4 } from 'uuid';
@@ -101,11 +103,11 @@ export class SamOpportunitiesService {
           syncId,
           batchNumber,
           totalBatches: batches.length,
-          batchSize: batch.length,
+          batchSize: batch?.length || 0,
         });
 
         try {
-          const batchResult = await this.processBatch(batch, options.dryRun || false);
+          const batchResult = await this.processBatch(batch || [], options.dryRun || false);
           
           recordsProcessed += batchResult.processed;
           recordsCreated += batchResult.created;
@@ -129,11 +131,11 @@ export class SamOpportunitiesService {
           logError(batchError, 'batch_processing_failed', {
             syncId,
             batchNumber,
-            batchSize: batch.length,
+            batchSize: batch?.length || 0,
           });
           
           errors.push(`Batch ${batchNumber} failed: ${batchError.message}`);
-          recordsFailed += batch.length;
+          recordsFailed += batch?.length || 0;
         }
 
         // Small delay between batches to prevent overwhelming the database
@@ -374,13 +376,17 @@ export class SamOpportunitiesService {
         }
 
         // Check if opportunity already exists
+        if (!opportunity.opportunityId) {
+          throw new Error('Missing required opportunityId field');
+        }
+        
         const existing = await this.opportunityRepo.findByOpportunityId(
           opportunity.opportunityId
         );
 
         if (existing) {
           // Update existing opportunity
-          await this.opportunityRepo.updateOpportunity(existing.id, {
+          await this.opportunityRepo.updateOpportunity(existing.id!, {
             ...this.mapApiToDb(opportunity),
             lastSyncedAt: new Date(),
             syncStatus: 'synced',
@@ -404,7 +410,7 @@ export class SamOpportunitiesService {
           title: opportunity.title,
         });
         
-        errors.push(`Failed to process ${opportunity.opportunityId}: ${error.message}`);
+        errors.push(`Failed to process opportunity ${opportunity.opportunityId || 'undefined'}: ${error.message}`);
         failed++;
       }
     }
@@ -415,9 +421,11 @@ export class SamOpportunitiesService {
   /**
    * Map SAM API opportunity to database format
    */
-  private mapApiToDb(opportunity: SamOpportunity): any {
+  private mapApiToDb(opportunity: any): any {
+    // The opportunity data is already transformed by samApiClient
+    // We just need to ensure correct field mapping for database
     return {
-      opportunityId: opportunity.opportunityId,
+      opportunityId: opportunity.opportunityId, // Already transformed by API client
       noticeId: opportunity.noticeId,
       title: opportunity.title,
       description: opportunity.description,
@@ -436,8 +444,8 @@ export class SamOpportunitiesService {
       postedDate: opportunity.postedDate ? new Date(opportunity.postedDate) : null,
       responseDeadline: opportunity.responseDeadLine ? new Date(opportunity.responseDeadLine) : null,
       updatedDate: opportunity.updatedDate ? new Date(opportunity.updatedDate) : null,
-      contactInfo: opportunity.contactInfo,
-      attachments: opportunity.attachments,
+      contactInfo: opportunity.contactInfo || [],
+      attachments: opportunity.attachments || [],
       awardNumber: opportunity.awardNumber,
       awardAmount: opportunity.awardAmount,
       awardeeName: opportunity.awardeeName,
@@ -445,10 +453,314 @@ export class SamOpportunitiesService {
       awardeeCage: opportunity.awardeeCage,
       awardeeInfo: opportunity.awardeeInfo,
       samUrl: opportunity.samUrl,
-      relatedNotices: opportunity.relatedNotices,
+      relatedNotices: opportunity.relatedNotices || [],
       rawData: opportunity.rawData || opportunity,
       dataSource: 'sam.gov',
     };
+  }
+
+  /**
+   * Sync opportunities for specific NAICS codes
+   */
+  async syncOpportunitiesForNaicsCodes(
+    naicsCodes: string[] = config.business.targetNaicsCodes,
+    options: any = {}
+  ): Promise<SyncResult> {
+    const syncId = uuidv4();
+    const startTime = new Date();
+    let recordsProcessed = 0;
+    let recordsCreated = 0;
+    let recordsUpdated = 0;
+    let recordsFailed = 0;
+    const errors: string[] = [];
+
+    try {
+      logger.info('Starting NAICS-specific opportunities sync', {
+        syncId,
+        naicsCodes,
+        options,
+      });
+
+      // Create sync log
+      await this.syncLogRepo.createSyncLog({
+        id: syncId,
+        syncType: 'naics_targeted',
+        status: 'running',
+        startedAt: startTime,
+        syncParameters: { naicsCodes, ...options },
+      });
+
+      for (const naicsCode of naicsCodes) {
+        try {
+          logger.info(`Syncing opportunities for NAICS ${naicsCode}`, { syncId, naicsCode });
+
+          // Search for opportunities with this NAICS code
+          const searchParams: Partial<SamApiSearchParams> = {
+            postedFrom: options.postedFrom || config.business.opportunitiesDateFrom,
+            postedTo: options.postedTo || config.business.opportunitiesDateTo,
+            ptype: options.ptype || 'a', // Award notices
+            ncode: naicsCode,
+            limit: 100, // Get more results per NAICS code
+            offset: 0,
+          };
+
+          const searchResult = await samApiClient.searchOpportunities(searchParams);
+
+          if (searchResult.opportunitiesData && searchResult.opportunitiesData.length > 0) {
+            // Process opportunities for this NAICS code
+            for (const opportunity of searchResult.opportunitiesData) {
+              try {
+                // Store in main opportunities table
+                const existingOpportunity = await this.opportunityRepo.findByOpportunityId(
+                  opportunity.opportunityId
+                );
+
+                if (existingOpportunity) {
+                  await this.opportunityRepo.updateOpportunity(existingOpportunity.id!, {
+                    ...this.mapApiToDb(opportunity),
+                    lastSyncedAt: new Date(),
+                    syncStatus: 'synced',
+                  });
+                  recordsUpdated++;
+                } else {
+                  await this.opportunityRepo.createOpportunity({
+                    ...this.mapApiToDb(opportunity),
+                    lastSyncedAt: new Date(),
+                    syncStatus: 'synced',
+                  });
+                  recordsCreated++;
+                }
+
+                // Store in NAICS-specific table
+                await naicsOpportunitiesRepository.upsertOpportunity({
+                  opportunityId: opportunity.opportunityId,
+                  naicsCode: naicsCode,
+                  postedDate: new Date(opportunity.postedDate || new Date()),
+                  responseDeadline: opportunity.responseDeadLine ? new Date(opportunity.responseDeadLine) : undefined,
+                  awardAmount: opportunity.awardAmount,
+                  title: opportunity.title,
+                  department: opportunity.department,
+                  opportunityType: opportunity.type,
+                });
+
+                recordsProcessed++;
+              } catch (error: any) {
+                recordsFailed++;
+                errors.push(`Failed to process opportunity ${opportunity.opportunityId}: ${error.message}`);
+                logError(error, 'naics_opportunity_processing_failed', {
+                  syncId,
+                  naicsCode,
+                  opportunityId: opportunity.opportunityId,
+                });
+              }
+            }
+          }
+
+          logger.info(`Completed sync for NAICS ${naicsCode}`, {
+            syncId,
+            naicsCode,
+            opportunitiesFound: searchResult.opportunitiesData?.length || 0,
+          });
+
+        } catch (error: any) {
+          errors.push(`Failed to sync NAICS ${naicsCode}: ${error.message}`);
+          logError(error, 'naics_sync_failed', { syncId, naicsCode });
+        }
+      }
+
+      const endTime = new Date();
+      const duration = endTime.getTime() - startTime.getTime();
+      const success = errors.length === 0;
+
+      // Update sync log
+      await this.syncLogRepo.updateSyncLog(syncId, {
+        status: success ? 'completed' : 'failed',
+        recordsProcessed,
+        recordsCreated,
+        recordsUpdated,
+        recordsFailed,
+        errorDetails: errors.length > 0 ? { errors } : null,
+        notes: `NAICS-targeted sync for codes: ${naicsCodes.join(', ')}`,
+      });
+
+      logBusinessEvent('naics_sync_completed', {
+        syncId,
+        success,
+        naicsCodes,
+        recordsProcessed,
+        recordsCreated,
+        recordsUpdated,
+        recordsFailed,
+        duration,
+      });
+
+      return {
+        success,
+        syncId,
+        recordsProcessed,
+        recordsCreated,
+        recordsUpdated,
+        recordsFailed,
+        errors,
+        duration,
+        startTime,
+        endTime,
+      };
+
+    } catch (error: any) {
+      const endTime = new Date();
+      const duration = endTime.getTime() - startTime.getTime();
+
+      await this.syncLogRepo.updateSyncLog(syncId, {
+        status: 'failed',
+        recordsProcessed,
+        recordsCreated,
+        recordsUpdated,
+        recordsFailed,
+        errorDetails: { error: error.message, errors },
+      });
+
+      logError(error, 'naics_sync_failed', { syncId, naicsCodes });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze opportunities with Flowise AI
+   */
+  async analyzeOpportunitiesWithAI(naicsCode?: string, limit: number = 10): Promise<any> {
+    try {
+      logger.info('Starting AI analysis of opportunities', { naicsCode, limit });
+
+      // Get opportunities that need AI analysis
+      const opportunities = await naicsOpportunitiesRepository.getOpportunitiesForAiAnalysis(limit);
+
+      if (opportunities.length === 0) {
+        return {
+          success: true,
+          message: 'No opportunities found that need AI analysis',
+          analyzed: 0,
+        };
+      }
+
+      const results = [];
+      let successful = 0;
+      let failed = 0;
+
+      for (const opportunity of opportunities) {
+        try {
+          logger.info('Analyzing opportunity with AI', {
+            opportunityId: opportunity.opportunityId,
+            naicsCode: opportunity.naicsCode,
+          });
+
+          // Get full opportunity data from main table
+          const fullOpportunity = await this.opportunityRepo.findByOpportunityId(
+            opportunity.opportunityId
+          );
+
+          if (fullOpportunity) {
+            const aiResult = await flowiseAiService.analyzeOpportunity(fullOpportunity);
+
+            if (aiResult.success) {
+              // Update the NAICS opportunity record with AI analysis
+              await naicsOpportunitiesRepository.updateAiAnalysis(
+                opportunity.opportunityId,
+                opportunity.naicsCode,
+                aiResult.response
+              );
+
+              successful++;
+              results.push({
+                opportunityId: opportunity.opportunityId,
+                naicsCode: opportunity.naicsCode,
+                success: true,
+                analysis: aiResult.response,
+              });
+            } else {
+              failed++;
+              results.push({
+                opportunityId: opportunity.opportunityId,
+                naicsCode: opportunity.naicsCode,
+                success: false,
+                error: aiResult.error,
+              });
+            }
+          }
+
+          // Add delay between AI requests to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+        } catch (error: any) {
+          failed++;
+          logError(error, 'ai_analysis_failed', {
+            opportunityId: opportunity.opportunityId,
+            naicsCode: opportunity.naicsCode,
+          });
+
+          results.push({
+            opportunityId: opportunity.opportunityId,
+            naicsCode: opportunity.naicsCode,
+            success: false,
+            error: error.message,
+          });
+        }
+      }
+
+      logBusinessEvent('ai_analysis_batch_completed', {
+        totalOpportunities: opportunities.length,
+        successful,
+        failed,
+      });
+
+      return {
+        success: true,
+        analyzed: opportunities.length,
+        successful,
+        failed,
+        results,
+      };
+
+    } catch (error: any) {
+      logError(error, 'ai_analysis_batch_failed', { naicsCode, limit });
+      throw error;
+    }
+  }
+
+  /**
+   * Get opportunities by NAICS code with filtering
+   */
+  async getOpportunitiesByNaics(
+    naicsCode: string,
+    filters: any = {},
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ opportunities: NaicsOpportunity[]; total: number }> {
+    try {
+      const [opportunities, total] = await Promise.all([
+        naicsOpportunitiesRepository.getOpportunitiesByNaics(naicsCode, filters, limit, offset),
+        naicsOpportunitiesRepository.countOpportunities({ ...filters, naicsCode }),
+      ]);
+
+      return { opportunities, total };
+    } catch (error: any) {
+      logError(error, 'get_opportunities_by_naics_failed', { naicsCode, filters });
+      throw error;
+    }
+  }
+
+  /**
+   * Get NAICS statistics
+   */
+  async getNaicsStatistics(dateFrom?: string, dateTo?: string): Promise<any> {
+    try {
+      const stats = await naicsOpportunitiesRepository.getNaicsStatistics(dateFrom, dateTo);
+      return stats;
+    } catch (error: any) {
+      logError(error, 'get_naics_statistics_failed', { dateFrom, dateTo });
+      throw error;
+    }
   }
 
   /**

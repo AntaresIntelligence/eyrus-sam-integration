@@ -225,7 +225,7 @@ export class SamSyncLogRepository {
         db(this.tableName)
           .where('status', 'completed')
           .whereNotNull('completed_at')
-          .avg(db.raw('EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000 as duration'))
+          .select(db.raw('AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000) as avg_duration'))
           .first(),
         
         // Total records processed
@@ -240,12 +240,12 @@ export class SamSyncLogRepository {
       }, {});
 
       return {
-        totalSyncs: parseInt(totalResult?.count || '0', 10),
+        totalSyncs: parseInt(String(totalResult?.count || '0'), 10),
         successfulSyncs: statusCounts['completed'] || 0,
         failedSyncs: statusCounts['failed'] || 0,
         runningSyncs: statusCounts['running'] || 0,
-        averageDuration: parseFloat(avgDurationResult?.avg || '0'),
-        totalRecordsProcessed: parseInt(totalRecordsResult?.total || '0', 10),
+        averageDuration: parseFloat(String(avgDurationResult?.avg_duration || '0')),
+        totalRecordsProcessed: parseInt(String(totalRecordsResult?.total || '0'), 10),
         recentSyncStatus: statusCounts,
       };
     } catch (error: any) {
