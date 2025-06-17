@@ -10,11 +10,12 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:implementation": "ts-node src/scripts/test-implementation.ts",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
-    "health-check": "ts-node src/scripts/health-check.ts"
+    "health-check": "ts-node -e \"import('./src/services/healthCheckService').then(h => h.healthCheckService.performHealthCheck(true).then(console.log))\""
   },
   "dependencies": {
     "axios": "^1.6.0",
